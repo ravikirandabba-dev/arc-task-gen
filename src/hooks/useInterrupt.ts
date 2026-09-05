@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { EngineState, EngineMetrics, TurnContext } from "@/types/interrupt";
 import { eventBus } from "@/lib/event-bus";
 import { interruptEngine } from "@/lib/interrupt-engine";
 import { metricsTracker } from "@/lib/metrics";
-import { turnManager } from "@/lib/turn-manager";
+import { voiceSessionManager } from "@/lib/voice-session-manager";
 import { playbackController } from "@/lib/playback-controller";
 
 /**
@@ -14,7 +14,7 @@ import { playbackController } from "@/lib/playback-controller";
 export function useInterrupt() {
   const [engineState, setEngineState] = useState<EngineState>(interruptEngine.getState());
   const [metrics, setMetrics] = useState<EngineMetrics>(metricsTracker.getSnapshot());
-  const [activeContext, setActiveContext] = useState<TurnContext | null>(turnManager.getActiveContext());
+  const [activeContext, setActiveContext] = useState<TurnContext | null>(voiceSessionManager.getActiveContext());
 
   useEffect(() => {
     const unsubState = eventBus.on("state:change", (payload) => {
@@ -31,7 +31,7 @@ export function useInterrupt() {
 
     // Invalidation event watcher
     const unsubInterrupt = eventBus.on("interruption:triggered", () => {
-      setActiveContext(turnManager.getActiveContext());
+      setActiveContext(voiceSessionManager.getActiveContext());
     });
 
     return () => {
@@ -45,10 +45,17 @@ export function useInterrupt() {
   // --- Simulation Actions ---
 
   const simulateStartSpeaking = () => {
-    if (engineState === EngineState.IDLE) {
-      turnManager.startTurn();
-    }
-    interruptEngine.startThinking();
+    eventBus.emit("vad:change", {
+      status: "DETECTED",
+      rms: 0,
+    });
+
+    setTimeout(() => {
+      eventBus.emit("vad:change", {
+        status: "SILENT",
+        rms: 0,
+      });
+    }, 1800);
   };
 
   const simulateInterrupt = () => {
@@ -56,30 +63,32 @@ export function useInterrupt() {
   };
 
   const simulateRapidInterruptions = () => {
-    let count = 0;
+    let i = 0;
+
     const interval = setInterval(() => {
-      if (count % 2 === 0) {
-        simulateStartSpeaking();
-      } else {
-        interruptEngine.interrupt();
-      }
-      count++;
-      if (count > 9) clearInterval(interval);
-    }, 300); // Trigger an interrupt/start every 300ms
+      eventBus.emit("vad:change", {
+        status: i % 2 === 0 ? "DETECTED" : "SILENT",
+        rms: 0,
+      });
+
+      i++;
+
+      if (i > 8) clearInterval(interval);
+    }, 400);
   };
 
   const simulateStaleResponse = () => {
-    const context = turnManager.getActiveContext();
+    const context = voiceSessionManager.getActiveContext();
     if (!context) {
-      turnManager.startTurn();
+      voiceSessionManager.startTurn();
     }
     
     // Grab the generation ID right now
-    const initialContext = turnManager.getActiveContext()!;
+    const initialContext = voiceSessionManager.getActiveContext()!;
     
     // Force a new turn to make the previous one stale
     setTimeout(() => {
-      turnManager.startTurn();
+      voiceSessionManager.startTurn();
     }, 200);
 
     // Attempt to enqueue playback using the original stale generation ID
@@ -93,7 +102,7 @@ export function useInterrupt() {
   };
 
   const simulateQueueMultiple = () => {
-    const ctx = turnManager.getActiveContext();
+    const ctx = voiceSessionManager.getActiveContext();
     if (!ctx) return;
 
     for (let i = 0; i < 5; i++) {

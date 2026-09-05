@@ -9,6 +9,7 @@ import { GlassCard } from "../ui/GlassCard";
 import { Button } from "../ui/Button";
 import { microphoneManager } from "@/lib/microphone-manager";
 import { playbackController } from "@/lib/playback-controller";
+import { voiceSessionManager } from "@/lib/voice-session-manager";
 import { eventBus } from "@/lib/event-bus";
 import { VOICE_CONFIG } from "@/config/voice";
 import { Mic, MicOff, ShieldAlert, FastForward, Clock, FileText } from "lucide-react";
@@ -20,6 +21,7 @@ export function LiveVoiceTest() {
   const [micStatus, setMicStatus] = useState<MicStatus>("OFF");
   const [vadStatus, setVadStatus] = useState<VADStatus>("SILENT");
   const [playbackStatus, setPlaybackStatus] = useState<PlaybackStatus>("STOPPED");
+  const [rimeConnected, setRimeConnected] = useState<boolean>(false);
   const [events, setEvents] = useState<{eventType: string, timestamp: number}[]>([]);
 
   useEffect(() => {
@@ -27,6 +29,9 @@ export function LiveVoiceTest() {
     const unsubVad = eventBus.on("vad:change", (p) => setVadStatus(p.status));
     const unsubPlay = eventBus.on("playback:status", (p) => setPlaybackStatus(p.status));
     const unsubLog = eventBus.on("event:log", (p) => {
+      if (p.eventType === "RIME_CONNECTED") {
+        setRimeConnected(true);
+      }
       setEvents((prev) => [{ eventType: p.eventType, timestamp: p.timestamp }, ...prev].slice(0, 20));
     });
 
@@ -48,10 +53,11 @@ export function LiveVoiceTest() {
   };
 
   const startTestAudio = () => {
-    actions.simulateStartSpeaking();
-    if (activeContext) {
-      playbackController.playTestAudio(activeContext.generationId);
+    let ctx = voiceSessionManager.getActiveContext();
+    if (!ctx) {
+      ctx = voiceSessionManager.startTurn();
     }
+    playbackController.playTestAudio(ctx.generationId);
   };
 
   const latency = metrics.lastLatencyMeasurement?.interruptionToSilenceMs ?? 0;
@@ -78,7 +84,7 @@ export function LiveVoiceTest() {
                  {micStatus === "ON" ? "Disable Microphone" : "Enable Microphone"}
                </Button>
                <div className="text-xs font-mono text-white/50">
-                 Provider: DEVELOPMENT AUDIO ADAPTER
+                 Provider: {rimeConnected ? <span className="text-green-400 font-bold tracking-widest">RIME CONNECTED</span> : "RIME SPEECH PROVIDER"}
                </div>
             </GlassCard>
 

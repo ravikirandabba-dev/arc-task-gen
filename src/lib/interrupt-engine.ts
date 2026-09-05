@@ -3,7 +3,7 @@ import { eventBus } from "./event-bus";
 import { voiceSessionManager } from "./voice-session-manager";
 import { recordingManager } from "./recording-manager";
 import { metricsTracker } from "./metrics";
-import { DevelopmentSpeechProvider } from "./providers/development-speech-provider";
+import { RimeSpeechProvider } from "./providers/rime-speech-provider";
 import { conversationEngine } from "./conversation/conversation-engine";
 import { conversationMemory } from "./conversation/conversation-memory";
 import { playbackController } from "./playback-controller";
@@ -15,7 +15,7 @@ import { playbackController } from "./playback-controller";
 class InterruptEngine {
   private currentState: EngineState = EngineState.IDLE;
   private interruptStartTime: number = 0;
-  private provider = new DevelopmentSpeechProvider();
+  private provider = new RimeSpeechProvider();
 
   constructor() {
     this.setState(EngineState.IDLE);
@@ -65,11 +65,10 @@ class InterruptEngine {
       }
     });
 
-    eventBus.on("event:log", (payload) => {
-      if (payload.eventType === "HARDWARE_SILENCED" && this.currentState === EngineState.RECOVERING) {
+    eventBus.on("PLAYBACK_STOPPED", () => {
+      if (this.currentState === EngineState.RECOVERING) {
         this.completeRecovery();
-      }
-      if (payload.eventType === "HARDWARE_SILENCED" && this.currentState === EngineState.SPEAKING) {
+      } else if (this.currentState === EngineState.SPEAKING) {
         this.setState(EngineState.LISTENING);
         voiceSessionManager.startTurn();
       }
@@ -94,6 +93,7 @@ class InterruptEngine {
       return; 
     }
 
+    const wasSpeaking = this.currentState === EngineState.SPEAKING;
     this.interruptStartTime = performance.now();
     metricsTracker.updateLatencyMeasurement({ interruptDetectedAt: this.interruptStartTime });
     eventBus.emit("event:log", { eventType: "INTERRUPTION_DETECTED", timestamp: this.interruptStartTime });
@@ -128,12 +128,9 @@ class InterruptEngine {
     // 5. Begin structural recovery
     this.setState(EngineState.RECOVERING);
     
-    // Fallback if hardware was already silent (e.g. interrupting during THINKING)
-    setTimeout(() => {
-      if (this.currentState === EngineState.RECOVERING) {
-         this.completeRecovery();
-      }
-    }, 50); 
+    if (!wasSpeaking) {
+      this.completeRecovery();
+    }
   }
 
   public abortGeneration(): void {
@@ -182,18 +179,6 @@ class InterruptEngine {
     eventBus.emit("event:log", { eventType: "LISTENING_RESUMED", timestamp: performance.now() });
   }
 
-  /**
-   * Starts a normal turn logic flow manually for simulation purposes.
-   */
-  public startThinking(): void {
-    if (this.currentState !== EngineState.LISTENING && this.currentState !== EngineState.IDLE) return;
-    this.setState(EngineState.THINKING);
-    setTimeout(() => {
-      if (this.currentState === EngineState.THINKING) {
-        this.setState(EngineState.SPEAKING);
-      }
-    }, 800);
-  }
 }
 
 export const interruptEngine = new InterruptEngine();

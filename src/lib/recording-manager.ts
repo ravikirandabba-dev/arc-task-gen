@@ -11,13 +11,32 @@ export class RecordingManager {
   public start(): void {
     const stream = microphoneManager.getStream();
     if (!stream) {
+      eventBus.emit("event:log", { eventType: "RECORDING_FAILED", timestamp: performance.now(), data: { reason: "Microphone stream unavailable" }});
       console.warn("Cannot start recording, microphone stream unavailable.");
       return;
     }
 
     try {
       this.chunks = [];
-      this.mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      
+      const mimes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/mp4'
+      ];
+      
+      let selectedMime = '';
+      for (const mime of mimes) {
+        if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(mime)) {
+          selectedMime = mime;
+          break;
+        }
+      }
+
+      const options = selectedMime ? { mimeType: selectedMime } : undefined;
+      
+      this.mediaRecorder = new MediaRecorder(stream, options);
       
       this.mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) this.chunks.push(e.data);
@@ -26,7 +45,7 @@ export class RecordingManager {
       this.mediaRecorder.onstop = () => {
         if (this.resolveRecording) {
           if (this.chunks.length > 0) {
-            const blob = new Blob(this.chunks, { type: 'audio/webm' });
+            const blob = new Blob(this.chunks, { type: selectedMime || 'audio/webm' });
             this.resolveRecording(blob);
           } else {
             this.resolveRecording(null);

@@ -1,8 +1,9 @@
+
 import { GenerationId, PlaybackId } from "@/types/interrupt";
 import { eventBus } from "./event-bus";
 import { metricsTracker } from "./metrics";
 import { voiceSessionManager } from "./voice-session-manager";
-import { DevelopmentPlaybackAdapter } from "./playback/development-playback-adapter";
+import { RimePlaybackAdapter } from "./playback/rime-playback-adapter";
 import { PlaybackAdapter } from "@/types/pipeline";
 
 export interface PlaybackItem {
@@ -21,11 +22,11 @@ class PlaybackController {
   private currentPlaybackId: PlaybackId | null = null;
   private stopRequestedAt: number | null = null;
   
-  private adapter: PlaybackAdapter;
+  private adapter: RimePlaybackAdapter;
 
   constructor() {
-    // Inject development adapter for Phase 7
-    const devAdapter = new DevelopmentPlaybackAdapter();
+    // Inject rime adapter
+    const devAdapter = new RimePlaybackAdapter();
     devAdapter.onStopRequested = () => {
       this.stopRequestedAt = performance.now();
       metricsTracker.updateLatencyMeasurement({ playbackStopRequestedAt: this.stopRequestedAt });
@@ -89,7 +90,7 @@ class PlaybackController {
     const now = performance.now();
     eventBus.emit("PLAYBACK_STARTED", { timestamp: now });
     eventBus.emit("playback:status", { status: "PLAYING", playbackId: this.currentPlaybackId });
-    eventBus.emit("event:log", { eventType: "PLAYBACK_START", timestamp: now });
+    eventBus.emit("event:log", { eventType: "PLAYBACK_STARTED", timestamp: now });
 
     try {
       await this.adapter.play(item.blob);

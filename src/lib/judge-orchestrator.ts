@@ -1,5 +1,5 @@
 import { interruptEngine } from "./interrupt-engine";
-import { turnManager } from "./turn-manager";
+import { voiceSessionManager } from "./voice-session-manager";
 import { playbackController } from "./playback-controller";
 import { eventBus } from "./event-bus";
 import { metricsTracker } from "./metrics";
@@ -26,34 +26,34 @@ class JudgeOrchestrator {
       // Scene 2: Voice engine begins speaking
       async () => {
         eventBus.emit("demo:scene", { sceneNumber: 2, title: "Commencing Duplex Generation" });
-        metricsTracker.reset(); // Clear previous manual tests
-        turnManager.startTurn();
-        interruptEngine.startThinking();
+        metricsTracker.reset();
         
-        // Wait for SPEAKING state
+        eventBus.emit("vad:change", { status: "DETECTED", rms: 0 });
+        await this.delay(200);
+        eventBus.emit("vad:change", { status: "SILENT", rms: 0 });
+
         await this.waitForState(EngineState.SPEAKING);
-        const ctx = turnManager.getActiveContext();
-        if (ctx) {
-          playbackController.playTestAudio(ctx.generationId);
-        }
-        await this.delay(1000); // Allow it to speak for a moment
+        await this.delay(1000); 
       },
       // Scene 3: Inject simulated user interruption
       async () => {
         eventBus.emit("demo:scene", { sceneNumber: 3, title: "Injecting Micro-latency Interruption" });
         await this.delay(500);
-        interruptEngine.interrupt();
+        // Emulate true VAD detection during speaking
+        eventBus.emit("vad:change", { status: "DETECTED", rms: 0 });
       },
       // Scene 4: Playback stops & calculate latency
       async () => {
         eventBus.emit("demo:scene", { sceneNumber: 4, title: "Hardware Playback Terminated" });
         await this.waitForState(EngineState.RECOVERING);
-        await this.delay(800); // Visual pause to read latency
+        await this.delay(800); 
       },
       // Scene 5: Recovery
       async () => {
         eventBus.emit("demo:scene", { sceneNumber: 5, title: "State Reconciliation & Flushing" });
         await this.delay(1000);
+        // Release VAD silence to resume listening
+        eventBus.emit("vad:change", { status: "SILENT", rms: 0 });
       },
       // Scene 6: Listening resumes
       async () => {
@@ -64,13 +64,15 @@ class JudgeOrchestrator {
       // Scene 7: Second generation
       async () => {
         eventBus.emit("demo:scene", { sceneNumber: 7, title: "Initiating Follow-up Turn" });
-        turnManager.startTurn();
+        eventBus.emit("vad:change", { status: "DETECTED", rms: 0 });
+        await this.delay(200);
+        eventBus.emit("vad:change", { status: "SILENT", rms: 0 });
+        await this.waitForState(EngineState.THINKING);
         await this.delay(1000);
       },
       // Scene 8: Reject stale generation
       async () => {
         eventBus.emit("demo:scene", { sceneNumber: 8, title: "Strict Turn Fencing (Stale Rejection)" });
-        // Create a fake playback item using an explicitly bad Generation ID
         playbackController.enqueue({
           playbackId: `play_stale_${crypto.randomUUID()}`,
           generationId: `gen_stale_${crypto.randomUUID()}`,
