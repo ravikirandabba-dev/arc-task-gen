@@ -95,7 +95,16 @@ class InterruptEngine {
 
     const wasSpeaking = this.currentState === EngineState.SPEAKING;
     this.interruptStartTime = performance.now();
-    metricsTracker.updateLatencyMeasurement({ interruptDetectedAt: this.interruptStartTime });
+    
+    // Clear the previous measurement and start a new one
+    metricsTracker.getSnapshot().lastLatencyMeasurement = null;
+    metricsTracker.updateLatencyMeasurement({ 
+      interruptDetectedAt: this.interruptStartTime,
+      playbackStopRequestedAt: null,
+      playbackActuallyStoppedAt: null,
+      interruptionToSilenceMs: null
+    });
+    
     eventBus.emit("event:log", { eventType: "INTERRUPTION_DETECTED", timestamp: this.interruptStartTime });
 
     this.setState(EngineState.INTERRUPTED);

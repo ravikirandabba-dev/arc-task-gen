@@ -53,7 +53,7 @@ export function TurnInspector({ context }: TurnInspectorProps) {
             <Hash size={10} /> Timestamp
           </span>
           <span className="text-sm font-mono text-white/90 bg-black/40 px-2 py-1 rounded inline-block w-fit">
-            {new Date(context.timestamp).toISOString()}
+            {new Date(Date.now() - performance.now() + context.timestamp).toISOString().substring(11, 23)}
           </span>
         </div>
       </div>
