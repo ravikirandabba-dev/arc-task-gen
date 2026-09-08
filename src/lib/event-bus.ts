@@ -19,16 +19,21 @@ class EventBus {
     event: K,
     callback: EventCallback<EngineEventPayloads[K]>
   ): () => void {
-    if (!this.listeners[event]) {
-      this.listeners[event] = [];
-    }
-    this.listeners[event]!.push(callback);
+    const handlers = this.listeners[event] ?? [];
+    const typedHandlers = handlers as Array<EventCallback<EngineEventPayloads[K]>>;
+    typedHandlers.push(callback);
+    // Bypass TS compiler limitation: mapping generic unions to indexed arrays resolves to 'never'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (this.listeners as any)[event] = typedHandlers;
 
     // Return unsubscribe function
     return () => {
-      if (this.listeners[event]) {
-        // @ts-expect-error Type matching complex discriminated unions
-        this.listeners[event] = this.listeners[event].filter((cb) => cb !== callback);
+      const currentHandlers = this.listeners[event];
+      if (currentHandlers) {
+        const index = (currentHandlers as Array<unknown>).indexOf(callback);
+        if (index > -1) {
+          currentHandlers.splice(index, 1);
+        }
       }
     };
   }
@@ -47,6 +52,7 @@ class EventBus {
     event: K,
     payload: EngineEventPayloads[K]
   ): void {
+    console.log(`[EVENT_BUS] emit: ${event}`, typeof payload === 'object' ? JSON.stringify(payload) : payload);
     if (this.listeners[event]) {
       this.listeners[event]!.forEach((cb) => {
         try {

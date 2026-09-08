@@ -18,7 +18,11 @@ export class ConversationEngine {
   ): Promise<AssistantResponse | null> {
     
     // Simulate STT decoding since we do not have a real STT provider yet
-    const simulatedTranscribedText = "Hello, what is the status of the system?";
+    const turnCount = conversationMemory.getRecentTurns().length;
+    let simulatedTranscribedText = "Hello!";
+    if (turnCount === 0) simulatedTranscribedText = "How do I make the carbonara?";
+    else if (turnCount === 1) simulatedTranscribedText = "Wait, how much cheese did you say?";
+    else simulatedTranscribedText = "Okay, what is the next step?";
 
     // 1. Analyze Intent
     const intentAnalysis = await intentAnalyzer.analyze(simulatedTranscribedText);
@@ -56,6 +60,7 @@ export class ConversationEngine {
       
       // Check for staleness post-generation
       if (voiceSessionManager.isStale(generationId)) {
+         turn.status = "cancelled";
          return null;
       }
       
@@ -104,3 +109,4 @@ export class ConversationEngine {
 }
 
 export const conversationEngine = new ConversationEngine();
+

@@ -65,7 +65,7 @@ export function DeveloperDiagnostics() {
   };
 
   return (
-    <section className="py-24 relative z-20 bg-[#000000]">
+    <section id="architecture" className="py-24 relative z-20 bg-[#000000]">
       <Container>
         <div className="flex justify-between items-start mb-12">
           <SectionHeading 

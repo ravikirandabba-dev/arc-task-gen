@@ -21,7 +21,7 @@ export function JudgeMode() {
   const isPass = avgLatency > 0 && avgLatency <= threshold;
 
   return (
-    <section className="py-24 relative z-20 bg-[#02040a] border-y border-white/5">
+    <section id="judge-mode" className="py-24 relative z-20 bg-[#02040a] border-y border-white/5">
       <Container>
         <SectionHeading 
           title="Judge Mode (Automated Demo)" 

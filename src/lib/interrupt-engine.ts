@@ -7,6 +7,7 @@ import { RimeSpeechProvider } from "./providers/rime-speech-provider";
 import { conversationEngine } from "./conversation/conversation-engine";
 import { conversationMemory } from "./conversation/conversation-memory";
 import { playbackController } from "./playback-controller";
+import { abortControllerManager } from "./abort-controller-manager";
 
 /**
  * The master engine coordinating the interruption and recovery orchestration sequence,
@@ -35,12 +36,21 @@ class InterruptEngine {
         }
       } else if (payload.status === "SILENT") {
         if (this.currentState === EngineState.THINKING) {
-          // Finish recording, send to Conversation Layer
-          const blob = await recordingManager.stop();
+          // Capture context BEFORE async operation to prevent stale closure race conditions
           const ctx = voiceSessionManager.getActiveContext();
           const session = voiceSessionManager.getSession();
           
-          if (ctx && session) {
+          // Finish recording, send to Conversation Layer
+          const blob = await recordingManager.stop();
+          
+          // Verify we are still in THINKING state and context hasn't been invalidated by rapid interrupt
+          if (ctx && session && this.currentState === EngineState.THINKING && !voiceSessionManager.isStale(ctx.generationId)) {
+            if (!blob) {
+              // Revert back to listening if recording was empty
+              this.setState(EngineState.LISTENING);
+              voiceSessionManager.startTurn();
+              return;
+            }
             try {
               // Brain Layer Processing (STT -> LLM)
               const response = await conversationEngine.processUserAudio(
@@ -53,12 +63,22 @@ class InterruptEngine {
               // Only proceed if not stale and we got a valid response
               if (response && !voiceSessionManager.isStale(ctx.generationId)) {
                 // Speech Provider (TTS)
-                await this.provider.startGeneration(ctx.turnId, response);
-                this.setState(EngineState.SPEAKING);
-                await this.provider.play(ctx.generationId);
+                try {
+                  await this.provider.startGeneration(ctx.turnId, response);
+                  this.setState(EngineState.SPEAKING);
+                  await this.provider.play(ctx.generationId);
+                } catch (providerErr) {
+                  console.error("Provider synthesis failed", providerErr);
+                  this.setState(EngineState.LISTENING);
+                  voiceSessionManager.startTurn();
+                }
               }
             } catch (err) {
               console.warn("Conversation pipeline aborted", err);
+              if (this.currentState === EngineState.THINKING) {
+                this.setState(EngineState.LISTENING);
+                voiceSessionManager.startTurn();
+              }
             }
           }
         }
@@ -71,6 +91,13 @@ class InterruptEngine {
       } else if (this.currentState === EngineState.SPEAKING) {
         this.setState(EngineState.LISTENING);
         voiceSessionManager.startTurn();
+      }
+    });
+
+    eventBus.on("PLAYBACK_STARTED", () => {
+      if (this.currentState !== EngineState.INTERRUPTED && 
+          this.currentState !== EngineState.RECOVERING) {
+        this.setState(EngineState.SPEAKING);
       }
     });
   }
@@ -97,7 +124,6 @@ class InterruptEngine {
     this.interruptStartTime = performance.now();
     
     // Clear the previous measurement and start a new one
-    metricsTracker.getSnapshot().lastLatencyMeasurement = null;
     metricsTracker.updateLatencyMeasurement({ 
       interruptDetectedAt: this.interruptStartTime,
       playbackStopRequestedAt: null,
@@ -118,7 +144,8 @@ class InterruptEngine {
     }
 
     // 2. Stop Hardware Playback immediately.
-    this.provider.stop();
+    this.setState(EngineState.RECOVERING);
+    this.flushAudioQueue();
 
     // 3. Abort network generations & recording
     recordingManager.cancel();
@@ -134,8 +161,7 @@ class InterruptEngine {
     this.flushAudioQueue();
     this.flushGenerationQueue();
 
-    // 5. Begin structural recovery
-    this.setState(EngineState.RECOVERING);
+    // 5. Begin structural recovery (state already set)
     
     if (!wasSpeaking) {
       this.completeRecovery();
@@ -143,7 +169,7 @@ class InterruptEngine {
   }
 
   public abortGeneration(): void {
-    import("./abort-controller-manager").then(m => m.abortControllerManager.abortAll());
+    abortControllerManager.abortAll();
     eventBus.emit("event:log", { eventType: "GENERATION_ABORTED", timestamp: performance.now() });
   }
 

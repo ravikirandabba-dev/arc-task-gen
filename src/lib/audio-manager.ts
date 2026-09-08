@@ -10,11 +10,11 @@ export class AudioManager {
   private isRecording: boolean = false;
 
   /**
-   * Initializes the audio contexts required for playback and recording.
+   * Initializes the browser AudioContext. Must be triggered via user gesture.
    */
   public async initialize(): Promise<void> {
     if (typeof window !== "undefined") {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
       this.playbackContext = new AudioCtx();
     }
   }

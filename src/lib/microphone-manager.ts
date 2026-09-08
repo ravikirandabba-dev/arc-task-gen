@@ -14,6 +14,7 @@ class MicrophoneManager {
   
   private isCheckingVAD: boolean = false;
   private vadConsecutiveMs: number = 0;
+  private vadSilenceConsecutiveMs: number = 0;
   private vadLastTime: number = 0;
   private vadActive: boolean = false;
   private lastSilenceTime: number = 0;
@@ -112,6 +113,7 @@ class MicrophoneManager {
       const rms = Math.sqrt(sumSquares / dataArray.length);
       
       if (rms > VOICE_CONFIG.vad.vadThreshold) {
+        this.vadSilenceConsecutiveMs = 0;
         if (!this.vadActive && (now - this.lastSilenceTime > VOICE_CONFIG.vad.vadCooldownMs)) {
           this.vadConsecutiveMs += deltaMs;
           if (this.vadConsecutiveMs >= VOICE_CONFIG.vad.vadMinSpeechMs) {
@@ -125,11 +127,14 @@ class MicrophoneManager {
       } else {
         this.vadConsecutiveMs = 0;
         if (this.vadActive) {
-          this.vadActive = false;
-          this.lastSilenceTime = now;
-          eventBus.emit("vad:change", { status: "SILENT", rms });
-          eventBus.emit("SPEECH_ENDED", { timestamp: now });
-          eventBus.emit("event:log", { eventType: "SPEECH_ENDED", timestamp: now });
+          this.vadSilenceConsecutiveMs += deltaMs;
+          if (this.vadSilenceConsecutiveMs >= VOICE_CONFIG.vad.vadCooldownMs) {
+            this.vadActive = false;
+            this.lastSilenceTime = now;
+            eventBus.emit("vad:change", { status: "SILENT", rms });
+            eventBus.emit("SPEECH_ENDED", { timestamp: now });
+            eventBus.emit("event:log", { eventType: "SPEECH_ENDED", timestamp: now });
+          }
         }
       }
       

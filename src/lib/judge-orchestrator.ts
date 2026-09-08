@@ -1,5 +1,4 @@
 import { interruptEngine } from "./interrupt-engine";
-import { voiceSessionManager } from "./voice-session-manager";
 import { playbackController } from "./playback-controller";
 import { eventBus } from "./event-bus";
 import { metricsTracker } from "./metrics";

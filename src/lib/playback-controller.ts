@@ -4,7 +4,6 @@ import { eventBus } from "./event-bus";
 import { metricsTracker } from "./metrics";
 import { voiceSessionManager } from "./voice-session-manager";
 import { RimePlaybackAdapter } from "./playback/rime-playback-adapter";
-import { PlaybackAdapter } from "@/types/pipeline";
 
 export interface PlaybackItem {
   playbackId: PlaybackId;
@@ -32,12 +31,16 @@ class PlaybackController {
       metricsTracker.updateLatencyMeasurement({ playbackStopRequestedAt: this.stopRequestedAt });
       eventBus.emit("event:log", { eventType: "PLAYBACK_STOP_REQUESTED", timestamp: this.stopRequestedAt });
     };
+    
     devAdapter.onActuallyStopped = () => {
+      // If we aren't waiting for a stop (e.g. flushed), ignore stale callbacks
+      if (!this.stopRequestedAt && !this.isPlaying) return;
+      
       if (this.stopRequestedAt) {
         const actuallyStoppedAt = performance.now();
         metricsTracker.updateLatencyMeasurement({ playbackActuallyStoppedAt: actuallyStoppedAt });
-        eventBus.emit("PLAYBACK_STOPPED", { timestamp: actuallyStoppedAt });
         eventBus.emit("event:log", { eventType: "PLAYBACK_STOPPED", timestamp: actuallyStoppedAt });
+        eventBus.emit("PLAYBACK_STOPPED", { timestamp: actuallyStoppedAt });
       }
       this.isPlaying = false;
       this.stopRequestedAt = null;
@@ -87,13 +90,12 @@ class PlaybackController {
     this.isPlaying = true;
     this.currentPlaybackId = item.playbackId;
     
-    const now = performance.now();
-    eventBus.emit("PLAYBACK_STARTED", { timestamp: now });
-    eventBus.emit("playback:status", { status: "PLAYING", playbackId: this.currentPlaybackId });
-    eventBus.emit("event:log", { eventType: "PLAYBACK_STARTED", timestamp: now });
-
     try {
       await this.adapter.play(item.blob);
+      const now = performance.now();
+      eventBus.emit("PLAYBACK_STARTED", { timestamp: now });
+      eventBus.emit("playback:status", { status: "PLAYING", playbackId: this.currentPlaybackId });
+      eventBus.emit("event:log", { eventType: "PLAYBACK_STARTED", timestamp: now });
     } catch (e) {
       console.warn("Playback interrupted or failed:", e);
       this.isPlaying = false;
@@ -128,6 +130,7 @@ class PlaybackController {
       this.adapter.stop();
     }
     this.isPlaying = false;
+    // Do NOT clear stopRequestedAt, so asynchronous stop callbacks can complete latency calculations
     metricsTracker.updateQueueSizes(0, 0);
     eventBus.emit("event:log", { eventType: "AUDIO_QUEUE_FLUSHED", timestamp: performance.now() });
   }

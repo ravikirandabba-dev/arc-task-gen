@@ -18,26 +18,17 @@ export function Navigation() {
             </Link>
           </div>
           <nav className="hidden md:flex items-center gap-8">
-            <Link href="#" className="text-sm font-medium text-white/60 hover:text-white transition-colors">
-              Features
-            </Link>
-            <Link href="#" className="text-sm font-medium text-white/60 hover:text-white transition-colors">
-              Architecture
-            </Link>
-            <Link href="#" className="text-sm font-medium text-white/60 hover:text-white transition-colors">
-              DataForge 2026
-            </Link>
+            <Link href="#features" className="text-sm font-medium text-white/60 hover:text-white transition-colors">Features</Link>
+            <Link href="#architecture" className="text-sm font-medium text-white/60 hover:text-white transition-colors">Architecture</Link>
+            <Link href="#judge-mode" className="text-sm font-medium text-white/60 hover:text-white transition-colors">DataForge 2026</Link>
           </nav>
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" className="hidden md:inline-flex">
-              Documentation
-            </Button>
-            <Button variant="primary" size="sm" disabled>
-              Launch Mission
-            </Button>
+            <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-white/60 hover:text-white transition-colors hidden md:inline-flex">Documentation</a>
+            <Link href="#judge-mode"><Button variant="primary" size="sm">Launch Mission</Button></Link>
           </div>
         </div>
       </Container>
     </header>
   );
 }
+

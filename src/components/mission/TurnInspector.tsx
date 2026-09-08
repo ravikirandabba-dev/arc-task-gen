@@ -5,6 +5,8 @@ import { GlassCard } from "../ui/GlassCard";
 import { Cpu, Hash } from "lucide-react";
 import { TurnContext } from "@/types/interrupt";
 
+const sessionTimeOffset = typeof window !== 'undefined' ? Date.now() - performance.now() : 0;
+
 interface TurnInspectorProps {
   context: TurnContext | null;
 }
@@ -53,7 +55,7 @@ export function TurnInspector({ context }: TurnInspectorProps) {
             <Hash size={10} /> Timestamp
           </span>
           <span className="text-sm font-mono text-white/90 bg-black/40 px-2 py-1 rounded inline-block w-fit">
-            {new Date(Date.now() - performance.now() + context.timestamp).toISOString().substring(11, 23)}
+            {new Date(sessionTimeOffset + context.timestamp).toISOString().substring(11, 23)}
           </span>
         </div>
       </div>

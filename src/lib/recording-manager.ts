@@ -51,6 +51,7 @@ export class RecordingManager {
             this.resolveRecording(null);
           }
           this.resolveRecording = null;
+          this.chunks = []; // Clear memory immediately instead of waiting for next recording
         }
       };
 
@@ -89,6 +90,9 @@ export class RecordingManager {
 
   public cancel(): void {
     if (this.mediaRecorder && this.mediaRecorder.state !== "inactive") {
+      if (this.resolveRecording) {
+        this.resolveRecording(null);
+      }
       this.resolveRecording = null; // discard
       this.mediaRecorder.stop();
       

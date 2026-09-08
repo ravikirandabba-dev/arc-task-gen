@@ -12,7 +12,8 @@ export class DevelopmentPlaybackAdapter implements PlaybackAdapter {
 
   public async play(audioBlob: Blob | null): Promise<void> {
     if (!this.audioContext || this.audioContext.state === "closed") {
-      this.audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+      this.audioContext = new AudioContextConstructor();
     }
     
     this.playbackStart = performance.now();

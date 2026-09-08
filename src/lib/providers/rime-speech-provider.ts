@@ -62,11 +62,17 @@ export class RimeSpeechProvider implements SpeechProvider {
         }
       } catch (e: unknown) {
         if (e instanceof Error && e.name === "AbortError") {
-          console.log(`Generation ${generationId} was aborted.`);
+          eventBus.emit("event:log", { eventType: "GENERATION_ABORTED", timestamp: performance.now() });
         } else {
-          console.error("Speech generation error:", e);
+          eventBus.emit("event:log", { eventType: "GENERATION_ERROR", timestamp: performance.now(), data: e });
         }
         generationManager.cancelGeneration(generationId);
+        // Ensure the engine doesn't get permanently stuck in SPEAKING state if network fails
+        if (!voiceSessionManager.isStale(generationId)) {
+          eventBus.emit("PLAYBACK_STOPPED", { timestamp: performance.now() });
+        }
+      } finally {
+        abortControllerManager.remove(generationId);
       }
     };
 
@@ -81,6 +87,7 @@ export class RimeSpeechProvider implements SpeechProvider {
     generationManager.cancelGeneration(generationId);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public async play(_generationId: GenerationId): Promise<void> {
     // Normally enqueueing happens in startGeneration when audio is ready.
     // If play is called directly, we might handle it differently,

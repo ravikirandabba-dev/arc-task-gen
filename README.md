@@ -1,61 +1,52 @@
-# VoicePilot AI
+# VoicePilot AI - Real-time Cooking Execution Assistant
 
-VoicePilot AI is a next-generation voice interface for controlling complex applications. It leverages a custom-built interruption engine and conversational intelligence layer to provide seamless, full-duplex voice interactions.
+**Team Members:** Ravi Kiran, Aneesh, and Koushik
 
-## The Problem
-Traditional voice assistants act like walkie-talkies. You speak, you wait for them to finish, and if you try to interrupt them, they either ignore you or talk over you. This creates a stilted, frustrating user experience that fails to mimic natural human conversation.
 
-## Why Voice is Essential
-For complex workflows—like 3D modeling, coding, or navigating deep software menus—users' hands and eyes are already occupied. Voice provides a high-bandwidth, hands-free interface that can execute multi-step commands instantly.
-
-## The Hard Voice Problem
-The challenge isn't just speech-to-text or text-to-speech. The "hard problem" is conversational state management:
-- Detecting when a user is interrupting vs. just pausing.
-- Immediately halting ongoing audio synthesis and network streams to save bandwidth and compute.
-- Flawlessly resetting the conversational context so the AI knows it was cut off.
-- Doing all this with ultra-low latency (under 400ms) to feel natural.
+VoicePilot AI is a voice-native cooking execution assistant designed for hands-busy environments. It solves the critical hard problem of **real-time interruption and recovery**, allowing users to interrupt the AI mid-sentence to correct instructions or ask questions, without suffering from audio overlap or stale network state loops.
 
 ## Architecture
-VoicePilot AI solves this using a custom Finite State Machine (FSM) Engine:
-1. **Microphone/VAD:** Constantly listens for speech energy (RMS).
-2. **Interrupt Engine:** Manages states (`IDLE`, `LISTENING`, `THINKING`, `SPEAKING`, `RECOVERING`).
-3. **Conversation Intelligence Layer:** Maintains full conversational context, seamlessly invalidating stale responses.
-4. **Speech Provider (Rime):** Handles lightning-fast TTS using an `AbortController` network proxy.
-5. **Playback Controller:** Safely orchestrates HTML5 AudioContext, dynamically flushing blobs if they become stale.
 
-## Rime Configuration
-Rime acts as our primary Speech Provider, delivering sub-200ms latency TTS.
-Our Next.js API Proxy (`/api/speech`) securely connects to `https://users.rime.ai/v1/rime-tts` without exposing credentials to the client bundle.
+The system is built on a decoupled, event-driven architecture using Next.js 15:
+1. **Microphone Manager:** Raw WebAudio capture with debounced Voice Activity Detection (VAD).
+2. **Interrupt Engine:** The central Finite State Machine (FSM) that dictates \LISTENING\ -> \THINKING\ -> \SPEAKING\ -> \INTERRUPTED\ -> \RECOVERING\.
+3. **Turn Fencing (Voice Session Manager):** Drops "stale" asynchronous callbacks from network payloads that arrive after an interruption.
+4. **Playback Controller:** Strict, latency-measured WebAudio playback wrapper.
+5. **TTS Proxy:** Secure Next.js backend proxy (\/api/speech\) securely handling third-party API limits and keys.
 
-## Installation
-```bash
-git clone <repo>
-cd voice-pilot-ai
-npm ci
-```
+## Setup Instructions
 
-## Environment Variables
-Create a `.env.local` file:
-```env
-RIME_API_KEY=your_rime_api_key_here
-```
+1. Clone the repository.
+2. Ensure you are running Node.js >= 18.
+3. Duplicate \.env.example\ to \.env\ and add your keys:
+   \\\ash
+   cp .env.example .env
+   \\\
+   Fill in \RIME_API_KEY=\<YOUR_KEY>\.
+4. Install dependencies:
+   \\\ash
+   npm install
+   \\\
+5. Build and run the production server:
+   \\\ash
+   npm run build
+   npm run start
+   \\\
+6. Navigate to \http://localhost:3000\.
 
-## Demo Steps
-1. Run `npm run dev` and navigate to `http://localhost:3000`.
-2. Click **BEGIN DEMO** or manually click **Enable Microphone**.
-3. Observe the state changes and live latency metrics on the right dashboard.
+## Third-party Services & Configurations
 
-## Acceptance Test
-- Start the server, enable the microphone.
-- Speak out loud: "Hello, this is my first test."
-- The system should respond naturally via Rime TTS.
-- The latency metric should report < 400ms.
+- **TTS Provider:** Rime AI
+- **Rime Model ID:** \mistv2\
+- **Speaker:** \peak\
+- **Language:** \en\
+- **Endpoint:** \https://users.rime.ai/v1/rime-tts\
+- **Audio Format:** \udio/mp3\ (consumed via chunks directly into WebAudio \decodeAudioData\)
+- **Transport:** HTTPS POST
 
-## Stress Test
-- Say a long sentence. While the bot is replying, loudly interrupt it.
-- Observe the active generation is aborted and dropped.
-- The state instantly switches to `RECOVERING` and back to `LISTENING`.
+## Known Limitations & Failure Behaviors
 
-## Limitations
-- Mobile Safari enforces strict AudioContext rules, requiring specific user gestures to unlock playback.
-- Background tabs in browsers throttle timers, which may delay VAD detection or network polling.
+- **Mocked STT/LLM:** The current repository provides a local \DevelopmentLLMProvider\ with simulated Cooking Assistant responses to allow strict focus on the TTS audio pipeline without needing additional expensive LLM API keys.
+- **Hardware Silence Latency:** Depending on the browser (Chrome vs Safari) and OS audio driver, WebAudio \source.stop()\ can occasionally drop the \onended\ event entirely. We implemented a 25ms failsafe timeout.
+- **Network Failures:** If the Rime API is unreachable or returns a 5xx error, the generation is aborted, the FSM transitions gracefully back to \LISTENING\, and the system logs a \GENERATION_ERROR\.
+

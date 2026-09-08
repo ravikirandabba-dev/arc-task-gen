@@ -84,7 +84,8 @@ export function useInterrupt() {
     }
     
     // Grab the generation ID right now
-    const initialContext = voiceSessionManager.getActiveContext()!;
+    const initialContext = voiceSessionManager.getActiveContext();
+    if (!initialContext) return;
     
     // Force a new turn to make the previous one stale
     setTimeout(() => {

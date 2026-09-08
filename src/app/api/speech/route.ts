@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
         "Accept": "audio/mp3",
       },
       body: rimeReqBody,
+      signal: req.signal,
     });
 
     if (!response.ok) {

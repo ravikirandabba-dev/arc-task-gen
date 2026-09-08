@@ -12,40 +12,42 @@ export interface ExtendedEngineMetrics extends EngineMetrics {
   droppedResponsesCount: number;
 }
 
+const getInitialMetrics = (): ExtendedEngineMetrics => ({
+  interruptionCount: 0,
+  averageLatencyMs: 0,
+  fastestLatencyMs: null,
+  slowestLatencyMs: null,
+  cancelledPlaybackCount: 0,
+  droppedStaleResponsesCount: 0,
+  recoveryDurationMs: 0,
+  audioQueueSize: 0,
+  generationQueueSize: 0,
+  queueFlushesCount: 0,
+  cancelledGenerationsCount: 0,
+  recordingDurationMs: 0,
+  playbackDurationMs: 0,
+  speechDetectionCount: 0,
+  microphoneUptimeMs: 0,
+  conversationDurationMs: 0,
+  averageGenerationLatencyMs: 0,
+  averageResponseSizeBytes: 0,
+  interruptedGenerationsCount: 0,
+  recoveredTurnsCount: 0,
+  conversationCount: 0,
+  memoryUsageBytes: 0,
+  latestPromptSizeBytes: 0,
+  maxGenerationLatencyMs: 0,
+  minGenerationLatencyMs: 0,
+  p95GenerationLatencyMs: 0,
+  droppedResponsesCount: 0,
+  lastLatencyMeasurement: null,
+});
+
 /**
  * Singleton managing engineering observability and metrics tracking.
  */
 class MetricsTracker {
-  private metrics: ExtendedEngineMetrics = {
-    interruptionCount: 0,
-    averageLatencyMs: 0,
-    fastestLatencyMs: null,
-    slowestLatencyMs: null,
-    cancelledPlaybackCount: 0,
-    droppedStaleResponsesCount: 0,
-    recoveryDurationMs: 0,
-    audioQueueSize: 0,
-    generationQueueSize: 0,
-    queueFlushesCount: 0,
-    cancelledGenerationsCount: 0,
-    recordingDurationMs: 0,
-    playbackDurationMs: 0,
-    speechDetectionCount: 0,
-    microphoneUptimeMs: 0,
-    conversationDurationMs: 0,
-    averageGenerationLatencyMs: 0,
-    averageResponseSizeBytes: 0,
-    interruptedGenerationsCount: 0,
-    recoveredTurnsCount: 0,
-    conversationCount: 0,
-    memoryUsageBytes: 0,
-    latestPromptSizeBytes: 0,
-    maxGenerationLatencyMs: 0,
-    minGenerationLatencyMs: 0,
-    p95GenerationLatencyMs: 0,
-    droppedResponsesCount: 0,
-    lastLatencyMeasurement: null,
-  };
+  private metrics: ExtendedEngineMetrics = getInitialMetrics();
 
   private generationLatencies: number[] = [];
   private responseSizes: number[] = [];
@@ -80,10 +82,21 @@ class MetricsTracker {
         interruptionToSilenceMs: null,
       };
     }
-    this.metrics.lastLatencyMeasurement = {
-      ...this.metrics.lastLatencyMeasurement,
-      ...measurement,
-    };
+    if (measurement.interruptDetectedAt !== undefined) this.metrics.lastLatencyMeasurement.interruptDetectedAt = measurement.interruptDetectedAt;
+    if (measurement.playbackStopRequestedAt !== undefined) this.metrics.lastLatencyMeasurement.playbackStopRequestedAt = measurement.playbackStopRequestedAt;
+    if (measurement.playbackActuallyStoppedAt !== undefined) this.metrics.lastLatencyMeasurement.playbackActuallyStoppedAt = measurement.playbackActuallyStoppedAt;
+    if (measurement.interruptionToSilenceMs !== undefined) this.metrics.lastLatencyMeasurement.interruptionToSilenceMs = measurement.interruptionToSilenceMs;
+    
+    // Compute final if missing
+    if (this.metrics.lastLatencyMeasurement.interruptionToSilenceMs === null &&
+        this.metrics.lastLatencyMeasurement.playbackActuallyStoppedAt !== null && 
+        this.metrics.lastLatencyMeasurement.interruptDetectedAt !== null) {
+        
+        this.metrics.lastLatencyMeasurement.interruptionToSilenceMs = 
+          this.metrics.lastLatencyMeasurement.playbackActuallyStoppedAt - 
+          this.metrics.lastLatencyMeasurement.interruptDetectedAt;
+    }
+    
     this.broadcast();
   }
 
@@ -210,36 +223,7 @@ class MetricsTracker {
   }
   
   public reset(): void {
-    this.metrics = {
-      interruptionCount: 0,
-      averageLatencyMs: 0,
-      fastestLatencyMs: null,
-      slowestLatencyMs: null,
-      cancelledPlaybackCount: 0,
-      droppedStaleResponsesCount: 0,
-      recoveryDurationMs: 0,
-      audioQueueSize: 0,
-      generationQueueSize: 0,
-      queueFlushesCount: 0,
-      cancelledGenerationsCount: 0,
-      recordingDurationMs: 0,
-      playbackDurationMs: 0,
-      speechDetectionCount: 0,
-      microphoneUptimeMs: 0,
-      conversationDurationMs: 0,
-      averageGenerationLatencyMs: 0,
-      averageResponseSizeBytes: 0,
-      interruptedGenerationsCount: 0,
-      recoveredTurnsCount: 0,
-      conversationCount: 0,
-      memoryUsageBytes: 0,
-      latestPromptSizeBytes: 0,
-      maxGenerationLatencyMs: 0,
-      minGenerationLatencyMs: 0,
-      p95GenerationLatencyMs: 0,
-      droppedResponsesCount: 0,
-      lastLatencyMeasurement: null,
-    };
+    this.metrics = getInitialMetrics();
     this.latencies = [];
     this.recoveryDurations = [];
     this.generationLatencies = [];
@@ -248,7 +232,7 @@ class MetricsTracker {
   }
 
   private broadcast(): void {
-    eventBus.emit("metrics:update", this.metrics);
+    eventBus.emit("metrics:update", this.getMetrics());
   }
 }
 

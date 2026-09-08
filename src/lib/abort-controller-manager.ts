@@ -11,10 +11,19 @@ class AbortControllerManager {
    * Retrieves or creates an AbortController for a specific generation task.
    */
   public getController(id: GenerationId): AbortController {
-    if (!this.controllers.has(id)) {
-      this.controllers.set(id, new AbortController());
+    let controller = this.controllers.get(id);
+    if (!controller) {
+      controller = new AbortController();
+      this.controllers.set(id, controller);
     }
-    return this.controllers.get(id)!;
+    return controller;
+  }
+
+  /**
+   * Removes an AbortController without aborting it (used upon success).
+   */
+  public remove(id: GenerationId): void {
+    this.controllers.delete(id);
   }
 
   /**

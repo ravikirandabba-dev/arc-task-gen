@@ -15,6 +15,8 @@ import { VOICE_CONFIG } from "@/config/voice";
 import { Mic, MicOff, ShieldAlert, FastForward, Clock, FileText } from "lucide-react";
 import { MicStatus, VADStatus, PlaybackStatus } from "@/types/interrupt";
 
+const sessionTimeOffset = typeof window !== 'undefined' ? Date.now() - performance.now() : 0;
+
 export function LiveVoiceTest() {
   const { state, metrics, activeContext, actions } = useInterrupt();
   
@@ -32,7 +34,9 @@ export function LiveVoiceTest() {
       if (p.eventType === "RIME_CONNECTED") {
         setRimeConnected(true);
       }
-      setEvents((prev) => [{ eventType: p.eventType, timestamp: p.timestamp }, ...prev].slice(0, 20));
+      setEvents((prev) => {
+        return [{ eventType: p.eventType, timestamp: p.timestamp }, ...prev].slice(0, 20);
+      });
     });
 
     return () => {
@@ -66,7 +70,7 @@ export function LiveVoiceTest() {
   const isPass = isMeasured && latency <= threshold;
 
   return (
-    <section className="py-24 relative z-20 bg-[#02040a]">
+    <section id="features" className="py-24 relative z-20 bg-[#02040a]">
       <Container>
         <SectionHeading 
           title="Live Voice Test" 
@@ -165,7 +169,7 @@ export function LiveVoiceTest() {
               <div className="flex flex-col gap-1 mt-2">
                 {events.map((ev, i) => (
                   <div key={i} className="flex gap-4 text-sm font-mono items-center">
-                     <span className="text-white/30 shrink-0 w-24">{new Date(Date.now() - performance.now() + ev.timestamp).toISOString().substring(11, 23)}</span>
+                     <span className="text-white/30 shrink-0 w-24">{new Date(sessionTimeOffset + ev.timestamp).toISOString().substring(11, 23)}</span>
                      <span className={`
                        ${ev.eventType.includes('STALE') ? 'text-orange-400' : ''}
                        ${ev.eventType.includes('INTERRUPT') ? 'text-red-400' : ''}

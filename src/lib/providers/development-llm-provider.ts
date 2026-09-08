@@ -82,9 +82,11 @@ export class DevelopmentLLMProvider implements LLMProvider {
     const lastUser = prompt.messages[prompt.messages.length - 1];
     if (lastUser && lastUser.role === "user") {
       const lower = lastUser.content.toLowerCase();
-      if (lower.includes("hello")) return "Hello! Systems are fully operational. How can I assist you?";
-      if (lower.includes("status")) return "All core diagnostic pipelines are functioning within expected parameters.";
+      if (lower.includes("carbonara")) return "To make the carbonara, first boil a large pot of salted water. Then, cook 8 ounces of spaghetti until al dente.";
+      if (lower.includes("cheese")) return "You will need 1 cup of freshly grated Pecorino Romano cheese, mixed with two large eggs and black pepper.";
+      if (lower.includes("next")) return "While the pasta is cooking, fry 4 ounces of guanciale in a skillet until crispy. Do not drain the fat.";
     }
-    return "I am processing your request through the simulated development pipeline.";
+    return "I am ready for the next cooking instruction. What would you like to do?";
   }
 }
+
