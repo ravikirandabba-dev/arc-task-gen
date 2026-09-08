@@ -23,7 +23,7 @@ export function Navigation() {
             <Link href="#judge-mode" className="text-sm font-medium text-white/60 hover:text-white transition-colors">DataForge 2026</Link>
           </nav>
           <div className="flex items-center gap-4">
-            <a href="https://github.com/ravikirandabba-dev/arc-task-gen" target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-white/60 hover:text-white transition-colors">Documentation</a>
+            <a href="https://github.com/ravikirandabba-dev/arctaskgen" target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-white/60 hover:text-white transition-colors">Documentation</a>
             <Link href="#judge-mode"><Button variant="primary" size="sm">Launch Mission</Button></Link>
           </div>
         </div>
@@ -31,6 +31,7 @@ export function Navigation() {
     </header>
   );
 }
+
 
 
 
